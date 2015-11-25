@@ -16,24 +16,24 @@
         <section class="css-scrollable-list">
           <ul class="css-slots">
             <li class="css-slot">
-              <h3>undefined</h3>
-              <h6>undefined</h6>
+              <h3></h3>
+              <h6></h6>
             </li>
             <li class="css-slot">
-              <h3>undefined</h3>
-              <h6>undefined</h6>
+              <h3></h3>
+              <h6></h6>
             </li>
             <li class="css-slot">
-              <h3>undefined</h3>
-              <h6>undefined</h6>
+              <h3></h3>
+              <h6></h6>
             </li>
             <li class="css-slot">
-              <h3>undefined</h3>
-              <h6>undefined</h6>
+              <h3></h3>
+              <h6></h6>
             </li>
             <li class="css-slot">
-              <h3>undefined</h3>
-              <h6>undefined</h6>
+              <h3></h3>
+              <h6></h6>
             </li>
           </ul>
 
@@ -44,30 +44,8 @@
         </section>
       </div>
     </div>
-    <script src="./src/microajax.minified.js" type="text/javascript"></script>
     <script type="text/babel">
-      /**
-       * Global Checks
-       */
 
-       let sithHomeNearBy = () => {};
-
-       let atEdgeOfList = () => {};
-
-       let slotInfoObsolete = () => {};
-
-      /**
-       * Classes
-       */
-      
-      // class obiWanLocation = {
-      //   constructor() {
-
-      //   }
-      // }
-      // 
-      // 
-      // 
       let obiWanLocation = {
         displayStr : (suffix) => {return "Obi-Wan currently on " + suffix},
         location : null,
@@ -84,7 +62,14 @@
       //this could be stateless by triggering the desired events after, and creating a new function "getLocation" that gets called when the 'new row loaded' event needs to check it.
       //
       //
-      //
+      
+      let socket = new WebSocket('ws://localhost:4000');
+      socket.onopen = function() {
+        socket.send('Listening to Obi-Wan\'s location');
+      };
+      socket.onmessage = updateLocation;
+
+
       let entryHolder = [];
       class entry {
 
@@ -97,6 +82,13 @@
             console.log('in LogRes');
             console.log('err', err);
             console.log('res', res);
+            let data = JSON.parse(res.text);
+            console.log('id', data.id);
+            console.log('name', data.name);
+            console.log('homeworld', data.homeworld);
+            console.log('master', data.master);
+            console.log('apprentice', data.apprentice);
+
           };
           //later: must assign to be able to cancel, with req.abort();
           superagent.get("http://localhost:3000/dark-jedis/3616").end(logRes);
@@ -122,14 +114,7 @@
       //
       //
 
-      /**
-       * Sockets, Config
-       */
-      let socket = new WebSocket('ws://localhost:4000');
-      socket.onopen = function() {
-        socket.send('Listening to Obi-Wan\'s location');
-      };
-      socket.onmessage = updateLocation;
+
 
     </script>
 
