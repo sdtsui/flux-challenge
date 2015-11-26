@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
   <meta name="description" content="Vanilla JS Solution for the Flux Challenge"/>
-  <title>Vanilla JS Solution for the Flux Challenge</title>
+  <title>Flux Challenge</title>
   <link rel="stylesheet" href="../../styles.css" type="text/css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-core/5.8.25/browser.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/superagent/1.2.0/superagent.min.js"></script>
@@ -12,31 +12,10 @@
 <body>
     <div class="app-container">
       <div class="css-root">
-        <h1 class="css-planet-monitor">Obi-Wan currently on Tatooine</h1>
+        <h1 class="css-planet-monitor"></h1>
         <section class="css-scrollable-list">
           <ul class="css-slots">
-            <li class="css-slot">
-              <h3></h3>
-              <h6></h6>
-            </li>
-            <li class="css-slot">
-              <h3></h3>
-              <h6></h6>
-            </li>
-            <li class="css-slot">
-              <h3></h3>
-              <h6></h6>
-            </li>
-            <li class="css-slot">
-              <h3></h3>
-              <h6></h6>
-            </li>
-            <li class="css-slot">
-              <h3></h3>
-              <h6></h6>
-            </li>
           </ul>
-
           <div class="css-scroll-buttons">
             <button class="css-button-up"></button>
             <button class="css-button-down"></button>
@@ -45,77 +24,200 @@
       </div>
     </div>
     <script type="text/babel">
+      /**
+       * sithViewModel
+       */
+      class DashboardViewModel {
+        constructor($el, dashboardModel) {
+          this.$el = $el;
+          this.dashboardModel = dashboardModel;
+          this.DOM_nodes = new Array(5);
+          this.templateString = '<li class="css-slot"><h3></h3><h6></h6></li>';
+          this.render(dashboardModel);
+        }
+        render() {
+          let data = this.dashboardModel;
+          this.$el.innerHTML = '';
+          for (let idx = 0; idx < 5; idx++) {
+            //fetch name and homeworld, or leave empty
+            let isFetched = data.getData(idx) instanceof SithData;
+            let name = (!isFetched) ?  '' : data.getData(idx).name;
+            let homeworld = (!isFetched) ?  '' : 
+              'Homeworld: '+ data.getData(idx).homeworld.name;
 
-      let obiWanLocation = {
-        displayStr : (suffix) => {return "Obi-Wan currently on " + suffix},
-        location : null,
-        location_id: null,
-        $el: document.querySelector('.css-planet-monitor')
-      };
-      let updateLocation = (res) => {
-        let data = JSON.parse(res.data);
-        obiWanLocation.location = data.name;
-        obiWanLocation.location_id = data.id;
-        obiWanLocation.$el.innerHTML = obiWanLocation.displayStr(data.name);
-        console.log("Obi-Wan's Location : ", obiWanLocation.location);
+            let newSlot = document.createElement('li');
+            newSlot.innerHTML = '<h3>' + name +'</h3><h6>'+ homeworld +'</h6>';
+            newSlot.classList.toggle('css-slot');
+            
+            this.$el.appendChild(newSlot);
+          }
+        }
+
+      }
+
+      class ButtonController {
+        constructor(btn_up, btn_down, facade) {
+          this.facade = facade || new Error('No facade to emit to.');
+          this.btn_up = btn_up;
+          this.btn_down = btn_down;
+          this.btn_up.addEventListener('mousedown', this.facade.buttonClicked);
+          this.btn_down.addEventListener('mousedown', this.facade.buttonClicked);
+        }
+        // toggleActive(element) {    
+        //   // if 
+        //   // element.addEventListener('mousedown', this.facade.buttonClicked);
+        // }
+
+        // deactivate(element) {
+        //   //style, remove event listener
+        // }
+        
+      }
+
+      /**
+       * Obi-Wan + Sockets
+       */
+
+      class jediTracker_viewModel {
+
+        constructor() {
+          this.location = null;
+          this.location_id = null;
+          this.$el = document.querySelector('.css-planet-monitor');
+        }
+        
+        displayStr(suffix) {return "Obi-Wan currently on " + suffix}
+
+        updateLoc(res) {
+          let data = JSON.parse(res.data);
+          this.location = data.name;
+          this.location_id = data.id;
+          this.$el.innerHTML = this.displayStr(data.name);
+          console.log("Obi-Wan's Location : ", this.location);
+        }
+
       }
       //this could be stateless by triggering the desired events after, and creating a new function "getLocation" that gets called when the 'new row loaded' event needs to check it.
-      //
-      //
+
+      /**
+       * facade
+       */
+
+      class Facade {
+        constructor(dashboardModel, jediTracker, dashboardView) {
+        }
+
+        newSithLoaded(newSith) {
+          console.log('__NEW SITH FETCHED__: ', newSith);
+        }
+
+        buttonClicked(event) {
+          let classes = event.currentTarget.classList;
+          if (!classes.contains('css-button-disabled')) {
+            console.log('__BUTTON CLICKED__ : ', event.target.classList);
+          }
+        }
+
+        jediMoved(newLocation) {
+          console.log('__OBI_MOVED_: ' newLocation);
+
+        }
+
+        dashboardMoves() {
+
+        }
+
+      }
+      /**
+       * Instantiate Dashboard, and data holders
+       */
+
+      class DashboardModel {
+       constructor() {
+         this._data = new Array(5);
+         this._data[2] = new RequestContainer("http://localhost:3000/dark-jedis/3616", 2, this);
+       }
+
+       setData(idx, data) {
+         this._data[idx] = data;
+       }
+
+       getData(idx) {
+         return this._data[idx];
+       }
+      }
+
+      class SithData {
+       constructor(data) {
+         //Could refactor to use destructuring?
+         this.id = data.id;
+         this.name = data.name;
+         this.homeworld = data.homeworld;
+         this.master = data.master;
+         this.apprentice = data.apprentice;
+       }
+      }
+
+      class RequestContainer {
+       constructor(url, idx, dashboard) {
+         this.dashboardIndex = idx;
+         this.dashboard = dashboard;
+         this.active = false;
+         this.url = url;
+         this.sendRequest(this.url);
+       }
+
+       sendRequest(url) {
+         superagent.get(url).end((err, res) => {
+           if (err) return;
+           let newData = JSON.parse(res.text);
+           //trigger new sith
+           console.log('this in SA callback:', this);
+           this.dashboard.setData(this.dashboardIndex, new SithData(newData));
+           __dashboardView.render(__dashboardModel);
+         });
+         //request sending URL;
+           //on success:trigger 'new sith'
+           //on failure: silently fail if request cancelled
+       }
+
+       cancelRequest() {
+         if (this.isActive()) this.req.abort();
+       }
+
+       isActive() {
+         return !!this.active;
+       }
+      }
+
+
+      /**
+       * Dashboard
+       */
+      
+
+      let __dashboardModel = new DashboardModel();
+      console.log('data get at 2 :', __dashboardModel.getData(2));
+      let __dashboardView = new DashboardViewModel(document.querySelector('.css-slots'), __dashboardModel);
+
+      /**
+       * Socket Listen
+       */
       
       let socket = new WebSocket('ws://localhost:4000');
-      socket.onopen = function() {
+      socket.onopen = () => {
         socket.send('Listening to Obi-Wan\'s location');
       };
-      socket.onmessage = updateLocation;
+
+      let obi_Location = new jediTracker_viewModel();
+      socket.onmessage = obi_Location.updateLoc.bind(obi_Location);
 
 
-      let entryHolder = [];
-      class entry {
+      let __changeManager = new Facade(__dashboardModel, obi_Location, __dashboardView);
 
-        constructor(opt) {
-          this.path = opt.path;
-        }
-
-        refresh() {
-          let logRes = (err, res) => {
-            console.log('in LogRes');
-            console.log('err', err);
-            console.log('res', res);
-            let data = JSON.parse(res.text);
-            console.log('id', data.id);
-            console.log('name', data.name);
-            console.log('homeworld', data.homeworld);
-            console.log('master', data.master);
-            console.log('apprentice', data.apprentice);
-
-          };
-          //later: must assign to be able to cancel, with req.abort();
-          superagent.get("http://localhost:3000/dark-jedis/3616").end(logRes);
-        }
-
-        // this.obsolete = false,
-        // this.load = '',
-        // this.unload = '',
-        // this.$el = '',
-        // this.childIndex = '',
-        // this.pendingAJAX = ''
-      };
-
-      let sith1 = new entry({path: "http://localhost:3000/dark-jedis/3616"});
-      console.log('sith1 :', sith1);
-      sith1.refresh();
-      //css3 nth type selector --- 
-
-      // class sithData = {
-      //   constructor(opts){
-      //   }
-      // }
-      //
-      //
-
-
-
+      let up = document.querySelector('.css-button-up');
+      let down = document.querySelector('.css-button-down');
+      let __buttonController = new ButtonController(up, down, __changeManager);
     </script>
 
 </body>
