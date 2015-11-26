@@ -25,7 +25,7 @@
     </div>
     <script type="text/babel">
       /**
-       * sithViewModel
+       * --=sithViewModel
        */
       class DashboardViewModel {
         constructor($el, dashboardModel) {
@@ -55,7 +55,12 @@
 
       }
 
+      /**
+       * --=ButtonController
+       */
+
       class ButtonController {
+
         constructor(btn_up, btn_down, facade) {
           this.facade = facade || new Error('No facade to emit to.');
           this.btn_up = btn_up;
@@ -63,19 +68,36 @@
           this.btn_up.addEventListener('mousedown', this.facade.buttonClicked);
           this.btn_down.addEventListener('mousedown', this.facade.buttonClicked);
         }
-        // toggleActive(element) {    
-        //   // if 
-        //   // element.addEventListener('mousedown', this.facade.buttonClicked);
-        // }
 
-        // deactivate(element) {
-        //   //style, remove event listener
-        // }
-        
+        activeButtonToggle(button) {
+          let up = this.btn_up.classList;
+          let down = this.btn_down.classList;
+          switch (button) {
+            case 'up': 
+              up.toggle('css-button-disabled');
+              break;
+            case 'down':
+              down.toggle('css-button-disabled');
+              break;
+            case 'all':
+              up.toggle('css-button-disabled');
+              down.toggle('css-button-disabled');
+              break;
+            case 'off':
+              up.remove('css-button-disabled');
+              down.remove('css-button-disabled');
+              break;
+            case 'on':
+              up.add('css-button-disabled');
+              down.add('css-button-disabled');
+              break;
+          }
+        }
+
       }
 
       /**
-       * Obi-Wan + Sockets
+       * --=jediTracker
        */
 
       class jediTracker_viewModel {
@@ -101,15 +123,45 @@
       //this could be stateless by triggering the desired events after, and creating a new function "getLocation" that gets called when the 'new row loaded' event needs to check it.
 
       /**
-       * facade
+       * --=facade
        */
 
       class Facade {
         constructor(dashboardModel, jediTracker, dashboardView) {
         }
 
-        newSithLoaded(newSith) {
+        newSithLoaded(newSith, index_in_dash) {
           console.log('__NEW SITH FETCHED__: ', newSith);
+          let sithMatch = this.sithMatchTrue();
+          if (sithMatch) {
+            this.handleMatch(sithMatch); 
+            //Redundant logic in here, now that we have index_in_dash
+          } else {
+            //Button Logic
+            if (!__dashboardModel.mustFetchNew('apprentice')) {
+              //turn off bottom, turn on top
+              __buttonController.activeButtonToggle('off');
+              __buttonController.activeButtonToggle('top');
+            } else if (!__dashboardModel.mustFetchNew('master')) {
+              //turn off top, turn on bottom
+              __buttonController.activeButtonToggle('off');
+              __buttonController.activeButtonToggle('bottom');
+            } else {
+              //turn on both
+              __buttonController.activeButtonToggle('on');
+            }
+
+            //New Requests Logic:
+            let next = __dashboardModel.nextRequest(newSith, index_in_dash);
+            if (next !== null) {
+              //create a new request for that sith
+              __dashboardModel.setData(next.nextIndex, 
+                new RequestContainer(next.url, next.idx, __dashboardModel));
+            } else {
+              console.log("__NEXT IS NULL");
+            }
+            
+          }
         }
 
         buttonClicked(event) {
@@ -117,104 +169,249 @@
           if (!classes.contains('css-button-disabled')) {
             console.log('__BUTTON CLICKED__ : ', event.target.classList);
           }
+
+          if (__dashboardModel.numSithLoaded() < 1) {
+            __buttonController.activeButtonToggle('off');
+          }
         }
 
         jediMoved(newLocation) {
           console.log('__OBI_MOVED_: ', newLocation);
+          let sithMatch = this.sithMatchTrue();
+          if (sithMatch) {
+            this.handleMatch(sithMatch);
+          }
         }
 
-        dashboardMoves() {
-          //unnecessary right now.
+        sithMatchTrue() {
+          let match = false;
+          let matchIdx = null;
+          __dashboardModel._data.forEach((val, idx, collection) => {
+            if (__obiLocation.location_id === val.id){
+              match = true;
+              matchIdx = idx;
+              console.log('__TRIGGER_MATCH__', val.id, "STOP EVERYTHING");
+            }
+          });
+
+          if (!match) {
+            return match;
+          }          
+          return {
+            match: match,
+            matchIdx: matchIdx
+          };
+        }
+
+        handleMatch(match) {
+          let li = document.querySelectorAll('.css-slot')[match.matchIdx];
+          this.displaySithMatch(li);
+        }
+
+        displaySithMatch(li, start = true) {
+          //error checking for li and h1
+          for (let i = 0; i < li.childNodes.length; i++) {
+            li.childNodes[i].style.color = 'red';
+          }
+          //assume a full rerender when this event finishes;
+        }
+
+        freezeUI() {
+          __dashboardModel.cancellAllRequests();
+          __buttonController.activeButtonToggle('off');
         }
 
       }
       /**
-       * Instantiate Dashboard, and data holders
+       * --=DashboardModel
        */
 
       class DashboardModel {
-       constructor() {
-         this._data = new Array(5);
-         this._data[2] = new RequestContainer("http://localhost:3000/dark-jedis/3616", 2, this);
-       }
+        constructor() {
+          this._data = new Array(5);
+          this._data[2] = new RequestContainer("http://localhost:3000/dark-jedis/3616", 2, this);
+        }
 
-       setData(idx, data) {
-         this._data[idx] = data;
-       }
+        setData(idx, data) {
+          this._data[idx] = data;
+        }
 
-       getData(idx) {
-         return this._data[idx];
-       }
+        getData(idx) {
+          return this._data[idx];
+        }
+
+        cancelRequest(idx) {
+          let maybeReq = this.getData(idx);
+          if (maybeReq instanceof RequestContainer) {
+            maybeReq.cancelRequest();
+          }
+        }
+
+        cancelAllRequests() {
+          for (let i = 0; i < this._data.length; i++) {
+            cancelRequest(i);
+          }
+        }
+
+        mustFetchNew(relation) {
+          return new Error("String input must be 'apprentice' or 'master'.")
+          let mustFetchNew = true;
+          for (let i = 0; i < this._data.length; i++) {
+            let data = this._data[i];
+            if (data instanceof SithData && data[relation] === null) {
+              mustFetchNew = false;
+            }
+          }
+          return mustFetchNew;
+        }
+
+        numSithLoaded() {
+          let count = 0;
+          for (let i = 0; i< this._data.length; i++) {
+            let data = this._data[i];
+            if (data instanceof SithData) {
+              count++;
+            }
+          }
+          return count;
+        }
+
+        nextRequest(newSith, newestIdx) {
+          let nextIndex, url;
+          //if index is >=4, do nothing, just rerender
+          //else if index is <4 && apprentice exists, make a new requestContainer for  index+1
+          // -recurse down
+          //else if index is <4 && master exists, make a new requestContainer for index-1
+          //
+          
+          //if mustFetchnew apprentice AND newestIdx <4, get apprentice
+          //else if mustFetchnew master AND newestIdx >0, get master
+          //else : retur null
+          //
+          
+
+          
+          if (!this.mustFetchNew('apprentice')) {debugger;}
+          if (newestIdx >=4 || newestIdx <= 0) {
+            return null;
+          } else if (this.mustFetchNew('apprentice')) {
+            //fetch one down, continuously
+            nextIndex = newestIdx + 1;
+            url = newSith.apprentice.url;
+            debugger;
+          } else if (this.mustFetchNew('master')) {
+            //find the right index to query for master
+            
+            //go from bottom up, find the first slot that isn't a data element yet
+            //
+            let dataArr = __dashboardModel._data;
+            for (let i = dataArr.length-1; i > 0; i--) {
+              if (!(dataArr[i] instanceof SithData)) {
+                nextIndex = i;
+                url = dataArr[i+1].master.url;
+                debugger;
+                break;
+              }
+              break;
+            }
+            //should never reach here
+            console.log("ERROR: SHOULD NEVER REACH HERE");
+          }
+
+          if (!this.mustFetchNew('master') && !this.mustFetchNew('apprentice')) {
+            return null;
+          }
+
+          return {
+            idx : nextIndex,
+            url : url
+          }
+          
+        }
       }
+
+      /**
+       * --=sithData
+       */
 
       class SithData {
        constructor(data) {
          //Could refactor to use destructuring?
          this.id = data.id;
          this.name = data.name;
-         this.homeworld = data.homeworld;
+         this.homeworld = data.homeworld; //{id: , name: }
          this.master = data.master;
          this.apprentice = data.apprentice;
        }
       }
 
-      class RequestContainer {
-       constructor(url, idx, dashboard) {
-         this.dashboardIndex = idx;
-         this.dashboard = dashboard;
-         this.active = false;
-         this.url = url;
-         this.sendRequest(this.url);
-       }
+      /**
+       * --=requestContainer
+       */
 
-       sendRequest(url) {
-         superagent.get(url).end((err, res) => {
-           if (err) return;
-           let newData = JSON.parse(res.text);
-           //trigger new sith
-           console.log('this in SA callback:', this);
-           this.dashboard.setData(this.dashboardIndex, new SithData(newData));
-           __dashboardView.render(__dashboardModel);
-           __changeManager.newSithLoaded(this.dashboard.getData(this.dashboardIndex));;
-         });
+      class RequestContainer {
+        constructor(url, idx, dashboard) {
+          this.dashboardIndex = idx;
+          this.dashboard = dashboard;
+          this.active = false;
+          this.url = url;
+          this.sendRequest(this.url);
+        }
+
+        sendRequest(url) {
+          this.active = true;
+          superagent.get(url).end((err, res) => {
+            this.active = false;
+            
+            if (err) return;
+            let newData = JSON.parse(res.text);
+            let idx = this.dashboardIndex;
+            //trigger new sith
+            console.log('this in SA callback:', this);
+
+            this.dashboard.setData(idx, new SithData(newData));
+
+            
+            __dashboardView.render(__dashboardModel);
+            
+            __changeManager.newSithLoaded(this.dashboard.getData(idx), idx);;
+        });
          //request sending URL;
            //on success:trigger 'new sith'
            //on failure: silently fail if request cancelled
-       }
+        }
 
-       cancelRequest() {
-         if (this.isActive()) this.req.abort();
-       }
+        cancelRequest() {
+          if (this.isActive()) this.req.abort();
+        }
 
-       isActive() {
-         return !!this.active;
-       }
+        isActive() {
+          return !!this.active;
+        }
       }
-
-
-      /**
-       * Dashboard
-       */
-      
-
-      let __dashboardModel = new DashboardModel();
-      console.log('data get at 2 :', __dashboardModel.getData(2));
-      let __dashboardView = new DashboardViewModel(document.querySelector('.css-slots'), __dashboardModel);
-
       /**
        * Socket Listen
        */
-      
+
       let socket = new WebSocket('ws://localhost:4000');
       socket.onopen = () => {
         socket.send('Listening to Obi-Wan\'s location');
       };
 
-      let obi_Location = new jediTracker_viewModel();
-      socket.onmessage = obi_Location.updateLoc.bind(obi_Location);
+      var __obiLocation = new jediTracker_viewModel();
+      socket.onmessage = __obiLocation.updateLoc.bind(__obiLocation);
 
+      /**
+       * Dashboard
+       */
 
-      let __changeManager = new Facade(__dashboardModel, obi_Location, __dashboardView);
+      let __dashboardModel = new DashboardModel();
+      console.log('data get at 2 :', __dashboardModel.getData(2));
+      let __dashboardView = new DashboardViewModel(document.querySelector('.css-slots'), __dashboardModel);
+      console.log(__dashboardView);
+      
+
+      let __changeManager = new Facade(__dashboardModel, __obiLocation, __dashboardView);
 
       let up = document.querySelector('.css-button-up');
       let down = document.querySelector('.css-button-down');
