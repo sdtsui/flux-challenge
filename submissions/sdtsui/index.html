@@ -94,6 +94,7 @@
           this.location_id = data.id;
           this.$el.innerHTML = this.displayStr(data.name);
           console.log("Obi-Wan's Location : ", this.location);
+          __changeManager.jediMoved(this.location);
         }
 
       }
@@ -119,12 +120,11 @@
         }
 
         jediMoved(newLocation) {
-          console.log('__OBI_MOVED_: ' newLocation);
-
+          console.log('__OBI_MOVED_: ', newLocation);
         }
 
         dashboardMoves() {
-
+          //unnecessary right now.
         }
 
       }
@@ -175,6 +175,7 @@
            console.log('this in SA callback:', this);
            this.dashboard.setData(this.dashboardIndex, new SithData(newData));
            __dashboardView.render(__dashboardModel);
+           __changeManager.newSithLoaded(this.dashboard.getData(this.dashboardIndex));;
          });
          //request sending URL;
            //on success:trigger 'new sith'
