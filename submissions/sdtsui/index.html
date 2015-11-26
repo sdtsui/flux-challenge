@@ -115,7 +115,7 @@
           this.location = data.name;
           this.location_id = data.id;
           this.$el.innerHTML = this.displayStr(data.name);
-          console.log("Obi-Wan's Location : ", this.location);
+          // console.log("Obi-Wan's Location : ", this.location);
           __changeManager.jediMoved(this.location);
         }
 
@@ -138,11 +138,11 @@
             //Redundant logic in here, now that we have index_in_dash
           } else {
             //Button Logic
-            if (!__dashboardModel.mustFetchNew('apprentice')) {
+            if (!__dashboardModel.hasNew('apprentice')) {
               //turn off bottom, turn on top
               __buttonController.activeButtonToggle('off');
               __buttonController.activeButtonToggle('top');
-            } else if (!__dashboardModel.mustFetchNew('master')) {
+            } else if (!__dashboardModel.hasNew('master')) {
               //turn off top, turn on bottom
               __buttonController.activeButtonToggle('off');
               __buttonController.activeButtonToggle('bottom');
@@ -155,7 +155,7 @@
             let next = __dashboardModel.nextRequest(newSith, index_in_dash);
             if (next !== null) {
               //create a new request for that sith
-              __dashboardModel.setData(next.nextIndex, 
+              __dashboardModel.setData(next.idx, 
                 new RequestContainer(next.url, next.idx, __dashboardModel));
             } else {
               console.log("__NEXT IS NULL");
@@ -176,7 +176,6 @@
         }
 
         jediMoved(newLocation) {
-          console.log('__OBI_MOVED_: ', newLocation);
           let sithMatch = this.sithMatchTrue();
           if (sithMatch) {
             this.handleMatch(sithMatch);
@@ -253,16 +252,64 @@
           }
         }
 
-        mustFetchNew(relation) {
-          return new Error("String input must be 'apprentice' or 'master'.")
-          let mustFetchNew = true;
+
+        /** 
+         * currently checks by verifying if slots are instances of sithData:
+         * is tightly coupled with newSith function...
+         */
+        hasNew(relation) {
+          //NOT SURE IF THIS IS GETTING CALLED after a load, or before. Async issues.
+          if (relation !== 'apprentice' || relation !== 'master') {
+            new Error("String input must be 'apprentice' or 'master'.")
+          }
+          let hasNew = true;
+          let last = this_data.length - 1;
+
+          //looking for master, but top full
+          if (relation === 'master' && this._data[0]) {
+            return null;
+          }
+
+          //looking for apprentice, but bottom full
+          if (relation === 'apprentice' && this._data[last]) {
+            return null;
+          }
+
+          //tech debt: dashboardModel should have a getCount method
+          // if (this._data[0] === instanceof SithData && 
+          //   this._data[last] === intanceof SithData) {
+          //   return null;
+          // }
+
+
+          /** 
+           * must return : {
+           *   relation: ,
+           *   indexToInsert: ,
+           * }
+           */
+          
+          if (relation === 'apprentice') {
+            //loop from top to bottom, finding the first index where both conditions are true:
+            //  -element at idx is instanceof SithData
+            //  -element at idx has an 'apprentice' property that does not equal null
+            //  -element at idx+1 is empty
+          }
+
+
+          
           for (let i = 0; i < this._data.length; i++) {
             let data = this._data[i];
-            if (data instanceof SithData && data[relation] === null) {
-              mustFetchNew = false;
+            console.log("data:", data);
+            console.log('data instanceof sithdata : ', data instanceof SithData);
+            if (!!data && data instanceof SithData && (data[relation] === null)) {
+              console.log('inside: data relation : ', data[relation]);
+              hasNew = false;
             }
           }
-          return mustFetchNew;
+          
+
+          return new Error("faulty logic, should not reach this point");
         }
 
         numSithLoaded() {
@@ -278,55 +325,33 @@
 
         nextRequest(newSith, newestIdx) {
           let nextIndex, url;
-          //if index is >=4, do nothing, just rerender
-          //else if index is <4 && apprentice exists, make a new requestContainer for  index+1
-          // -recurse down
-          //else if index is <4 && master exists, make a new requestContainer for index-1
-          //
-          
-          //if mustFetchnew apprentice AND newestIdx <4, get apprentice
-          //else if mustFetchnew master AND newestIdx >0, get master
+          //if hasNew apprentice AND newestIdx <4, get apprentice
+          //else if hasNew master AND newestIdx >0, get master
           //else : retur null
           //
-          
-
-          
-          if (!this.mustFetchNew('apprentice')) {debugger;}
-          if (newestIdx >=4 || newestIdx <= 0) {
-            return null;
-          } else if (this.mustFetchNew('apprentice')) {
-            //fetch one down, continuously
+          if (this.hasNew('apprentice') && newestIdx < 4) {
+            // debugger;
             nextIndex = newestIdx + 1;
             url = newSith.apprentice.url;
-            debugger;
-          } else if (this.mustFetchNew('master')) {
-            //find the right index to query for master
-            
+          } else if (this.hasNew('master') && newestIdx > 0) {
             //go from bottom up, find the first slot that isn't a data element yet
-            //
             let dataArr = __dashboardModel._data;
-            for (let i = dataArr.length-1; i > 0; i--) {
-              if (!(dataArr[i] instanceof SithData)) {
+            for (let i = newestIdx; i > 0; i--) {
+              if (!(dataArr[i] instanceof SithData) && !(dataArr[i-1] instanceof SithData)) {
+                // debugger;
                 nextIndex = i;
                 url = dataArr[i+1].master.url;
-                debugger;
                 break;
               }
-              break;
             }
-            //should never reach here
-            console.log("ERROR: SHOULD NEVER REACH HERE");
-          }
-
-          if (!this.mustFetchNew('master') && !this.mustFetchNew('apprentice')) {
+          } else {
+            // debugger;
             return null;
           }
-
           return {
             idx : nextIndex,
             url : url
-          }
-          
+          };
         }
       }
 
@@ -337,6 +362,7 @@
       class SithData {
        constructor(data) {
          //Could refactor to use destructuring?
+         console.log('new SithData for', data.name);
          this.id = data.id;
          this.name = data.name;
          this.homeworld = data.homeworld; //{id: , name: }
@@ -367,13 +393,10 @@
             let newData = JSON.parse(res.text);
             let idx = this.dashboardIndex;
             //trigger new sith
-            console.log('this in SA callback:', this);
-
             this.dashboard.setData(idx, new SithData(newData));
-
+            console.log('idx/data', this.dashboard._data);
             
             __dashboardView.render(__dashboardModel);
-            
             __changeManager.newSithLoaded(this.dashboard.getData(idx), idx);;
         });
          //request sending URL;
@@ -406,7 +429,6 @@
        */
 
       let __dashboardModel = new DashboardModel();
-      console.log('data get at 2 :', __dashboardModel.getData(2));
       let __dashboardView = new DashboardViewModel(document.querySelector('.css-slots'), __dashboardModel);
       console.log(__dashboardView);
       
